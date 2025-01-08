@@ -27,6 +27,7 @@ class UsersHandler {
     return response;
   }
 
+  // eslint-disable-next-line no-unused-vars
   async getUserByIdHandler(request, h) {
     const { id } = request.params;
     const user = await this._service.getUserById(id);
