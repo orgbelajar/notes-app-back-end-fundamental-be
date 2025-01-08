@@ -18,7 +18,7 @@ class NotesHandler {
     try {
       this._validator.validateNotePayload(request.payload);
       const { title = 'untitled', body, tags } = request.payload;
-      const { id: credentialId } = request.auth.credentials;
+      const { id: credentialId } = request.auth.credentials; // id pada tabel users
 
       const noteId = await this._service.addNote({
         title, body, tags, owner: credentialId,

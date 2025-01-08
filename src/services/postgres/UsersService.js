@@ -13,7 +13,7 @@ class UsersService {
   }
 
   async addUser({ username, password, fullname }) {
-    // Verifikasi username, pastikan belum terdaftar.
+    // Verifikasi username di database, pastikan belum terdaftar.
     await this.verifyNewUsername(username);
 
     // Bila verifikasi lolos, maka masukkan user baru ke database.
