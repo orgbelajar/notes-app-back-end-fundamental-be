@@ -87,7 +87,21 @@ class UsersService {
       throw new AuthenticationError('Kredensial yang Anda berikan salah');
     }
 
-    return id; // id untuk membuat access dan refresh token
+    return id; // id untuk membuat access dan refresh token (artifact payload)
+  }
+
+  async getUsersByUsername(username) {
+    /*
+    Kueri untuk mendapatkan users (id, username, dan fullname)
+    yang username-nya mengandung kata yang diberikan pada parameter username.
+    Untuk melakukannya, gunakan LIKE expressions.
+    */
+    const query = {
+      text: 'SELECT id, username, fullname FROM users WHERE username LIKE $1',
+      values: [`%${username}%`], // Makan akan jadi sepeti ini contoh: %bebek%
+    };
+    const result = await this._pool.query(query);
+    return result.rows;
   }
 }
 

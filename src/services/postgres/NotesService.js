@@ -8,8 +8,14 @@ const NotFoundError = require('../../exceptions/NotFoundError');
 const AuthorizationError = require('../../exceptions/AuthorizationError');
 
 class NotesService {
-  constructor() {
+  /*
+  Menambahkan dependency terhadap CollaborationsService di dalam NotesService,
+  menggunakan teknik dependency injection
+  source: https://www.dicoding.com/academies/271/tutorials/17418
+  */
+  constructor(collaborationService) {
     this._pool = new Pool();
+    this._collaborationService = collaborationService;
   }
 
   async addNote({
@@ -34,8 +40,22 @@ class NotesService {
   }
 
   async getNotes(owner) {
+    /*
+    Penjelasan Query:
+    Mengambil seluruh kolom pada tabel notes,
+    kemudian menggabungkan (LEFT JOIN) tabel notes dengan collaborations berdasarkan note_id,
+    kemudian mengembalikan seluruh notes berdasarkan 2 kondisi dimana:
+    - Semua catatan yang dimiliki oleh user (user adalah owner dari catatan).
+    - Semua catatan yang user terlibat sebagai kolaborator (user adalah kolaborator dari catatan).
+    GROUP BY (Mengelompokkan hasil berdasarkan kolom notes.id),
+    Jadi GROUP BY berfungsi memastikan bahwa setiap note hanya muncul sekali,
+    meskipun ada banyak kolaborator yang terhubung.
+    */
     const query = {
-      text: 'SELECT * FROM notes WHERE owner = $1',
+      text: `SELECT notes.* FROM notes 
+      LEFT JOIN collaborations ON collaborations.note_id = notes.id 
+      WHERE notes.owner = $1 OR collaborations.user_id = $1
+      GROUP BY notes.id`,
       values: [owner],
     };
     const result = await this._pool.query(query);
@@ -43,8 +63,17 @@ class NotesService {
   }
 
   async getNoteById(id) {
+    /*
+    Untuk mendapatkan username dari pemilik catatan,
+    Kita harus melakukan join tabel catatan dengan users,
+    Kolom yang menjadi kunci dalam melakukan LEFT JOIN adalah users.id dengan notes.owner,
+    Dengan begitu notes yang dihasilkan dari kueri tersebut akan memiliki properti username.
+    */
     const query = {
-      text: 'SELECT * FROM notes WHERE id = $1',
+      text: `SELECT notes.*, users.username
+      FROM notes
+      LEFT JOIN users ON users.id = notes.owner
+      WHERE notes.id = $1`,
       values: [id],
     };
     const result = await this._pool.query(query);
@@ -99,6 +128,41 @@ class NotesService {
 
     if (note.owner !== owner) {
       throw new AuthorizationError('Anda tidak berhak mengakses resource ini');
+    }
+  }
+
+  /*
+  Fungsi verifyNoteAccess untuk verifikasi hak akses pengguna (userId) terhadap catatan (noteId),
+  baik sebagai owner maupun collaboration.
+  *Untuk lolos tahap verifikasi, pengguna haruslah seorang owner atau kolaborator dari catatan.
+  */
+  async verifyNoteAccess(noteId, userId) {
+    try {
+      //* Bila userId merupakan owner dari noteId maka ia lolos verfikasi
+      await this.verifyNoteOwner(noteId, userId);
+    } catch (error) {
+      /*
+      *Bila userId bukan owner dari noteId maka,
+      *akan membangkitkan NotfoundError(stop) atau AuthorizationError(lanjut).
+
+      *Bila error merupakan NotFoundError, maka langsung throw dengan error (NotFoundError),
+      *dan tidak perlu memeriksa hak akses kolaborator karena catatannya memang tidak ada.
+      */
+      if (error instanceof NotFoundError) {
+        throw error; // throw menyebabkan stop eksekusi kode
+      }
+      /*
+      *Bila hasilnya AuthorizationError, maka lanjutkan ke block try selanjutnya
+      *yaitu proses pemeriksaan hak akses kolaborator menggunakan fungsi verifyCollaborator.
+      */
+
+      try {
+        //* Jika userId seorang kolaborator, maka proses verfikasi lolos
+        await this._collaborationService.verifyCollaborator(noteId, userId);
+      } catch {
+        //* Jika userId bukan seorang kolaborator, maka throw AuthorizationError
+        throw error; // throw menyebabkan stop eksekusi kode
+      }
     }
   }
 }
