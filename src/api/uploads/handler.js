@@ -15,12 +15,12 @@ class UploadsHandler {
     this._validator.validateImageHeaders(data.hapi.headers);
 
     // eslint-disable-next-line max-len
-    const filename = await this._service.writeFile(data, data.hapi); // ex. filename = (162121test.jpg)
+    const fileLocation = await this._service.writeFile(data, data.hapi); // ex. filename = (162121test.jpg)
 
     const response = h.response({
       status: 'success',
       data: {
-        fileLocation: `http://${process.env.HOST}:${process.env.PORT}/upload/images/${filename}`,
+        fileLocation,
       },
     });
     response.code(201);
