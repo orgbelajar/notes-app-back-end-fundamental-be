@@ -3,4 +3,3 @@ node_modules
 .prod.env
 notes-api-webserver-fundamental-be.pem
 src/api/uploads/file
-nabil_syakir_accessKeys.csv
