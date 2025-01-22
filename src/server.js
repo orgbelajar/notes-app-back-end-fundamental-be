@@ -39,7 +39,7 @@ const _exports = require('./api/exports');
 const ProducerService = require('./services/rabbitmq/ProducerService');
 const ExportsValidator = require('./validator/exports');
 
-// uploads
+// Uploads
 const uploads = require('./api/uploads');
 const StorageService = require('./services/S3/StorageService');
 const UploadsValidator = require('./validator/uploads');
@@ -54,9 +54,6 @@ const init = async () => {
   const server = Hapi.server({
     port: process.env.PORT,
     host: process.env.HOST,
-    debug: {
-      request: ['error'],
-    },
     routes: {
       cors: {
         origin: ['*'],
