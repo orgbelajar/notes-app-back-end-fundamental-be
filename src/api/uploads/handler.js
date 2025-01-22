@@ -15,7 +15,7 @@ class UploadsHandler {
     this._validator.validateImageHeaders(data.hapi.headers);
 
     // eslint-disable-next-line max-len
-    const fileLocation = await this._service.writeFile(data, data.hapi); // ex. filename = (162121test.jpg)
+    const fileLocation = await this._service.writeFile(data, data.hapi); // ex. fileLocation = (162121test.jpg)
 
     const response = h.response({
       status: 'success',
