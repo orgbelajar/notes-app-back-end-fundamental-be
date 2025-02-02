@@ -21,7 +21,7 @@ class AuthenticationsHandler {
     const id = await this._usersService.verifyUserCredential(username, password);
 
     // Buat access dan refresh token setelah verifikasi kredensial selesai
-    const accessToken = this._tokenManager.generateAccessToken({ id });
+    const accessToken = this._tokenManager.generateAccessToken({ id }); // id pada tabel users
     const refreshToken = this._tokenManager.generateRefreshToken({ id });
 
     // Save refresh token ke tabel users di db notesapp

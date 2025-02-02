@@ -13,9 +13,10 @@ class NotesService {
   menggunakan teknik dependency injection
   source: https://www.dicoding.com/academies/271/tutorials/17418
   */
-  constructor(collaborationService) {
+  constructor(collaborationService, cacheService) {
     this._pool = new Pool();
     this._collaborationService = collaborationService;
+    this._cacheService = cacheService;
   }
 
   async addNote({
@@ -36,30 +37,44 @@ class NotesService {
       throw new InvariantError('Catatan gagal ditambahkan');
     }
 
+    await this._cacheService.delete(`notes:${owner}`);
     return result.rows[0].id;
   }
 
   async getNotes(owner) {
-    /*
-    Penjelasan Query:
-    Mengambil seluruh kolom pada tabel notes,
-    kemudian menggabungkan (LEFT JOIN) tabel notes dengan collaborations berdasarkan note_id,
-    kemudian mengembalikan seluruh notes berdasarkan 2 kondisi dimana:
-    - Semua catatan yang dimiliki oleh user (user adalah owner dari catatan).
-    - Semua catatan yang user terlibat sebagai kolaborator (user adalah kolaborator dari catatan).
-    GROUP BY (Mengelompokkan hasil berdasarkan kolom notes.id),
-    Jadi GROUP BY berfungsi memastikan bahwa setiap note hanya muncul sekali,
-    meskipun ada banyak kolaborator yang terhubung.
-    */
-    const query = {
-      text: `SELECT notes.* FROM notes 
-      LEFT JOIN collaborations ON collaborations.note_id = notes.id 
-      WHERE notes.owner = $1 OR collaborations.user_id = $1
-      GROUP BY notes.id`,
-      values: [owner],
-    };
-    const result = await this._pool.query(query);
-    return result.rows.map(mapDBToModel);
+    try {
+      // mendapatkan catatan dari cache
+      const result = await this._cacheService.get(`notes:${owner}`);
+      return JSON.parse(result);
+    } catch (error) {
+      // bila gagal, diteruskan dengan mendapatkan catatan dari database
+      /*
+      Penjelasan Query:
+      Mengambil seluruh kolom pada tabel notes,
+      kemudian menggabungkan (LEFT JOIN) tabel notes dengan collaborations berdasarkan note_id,
+      kemudian mengembalikan seluruh notes berdasarkan 2 kondisi dimana:
+      - Semua catatan yang dimiliki oleh user (user adalah owner dari catatan).
+      - Semua catatan yang user terlibat sebagai kolaborator (user adalah kolaborator dari catatan).
+      GROUP BY (Mengelompokkan hasil berdasarkan kolom notes.id),
+      Jadi GROUP BY berfungsi memastikan bahwa setiap note hanya muncul sekali,
+      meskipun ada banyak kolaborator yang terhubung.
+      */
+      const query = {
+        text: `SELECT notes.* FROM notes 
+        LEFT JOIN collaborations ON collaborations.note_id = notes.id 
+        WHERE notes.owner = $1 OR collaborations.user_id = $1
+        GROUP BY notes.id`,
+        values: [owner],
+      };
+
+      const result = await this._pool.query(query);
+      const mappedResult = result.rows.map(mapDBToModel);
+
+      // catatan akan disimpan pada cache sebelum fungsi getNotes dikembalikan
+      await this._cacheService.set(`notes:${owner}`, JSON.stringify(mappedResult));
+
+      return mappedResult;
+    }
   }
 
   async getNoteById(id) {
@@ -88,7 +103,7 @@ class NotesService {
   async editNoteById(id, { title, body, tags }) {
     const updatedAt = new Date().toISOString();
     const query = {
-      text: 'UPDATE notes SET title = $1, body = $2, tags = $3, updated_at = $4 WHERE id = $5 RETURNING id',
+      text: 'UPDATE notes SET title = $1, body = $2, tags = $3, updated_at = $4 WHERE id = $5 RETURNING id, owner',
       values: [title, body, tags, updatedAt, id],
     };
 
@@ -97,11 +112,14 @@ class NotesService {
     if (!result.rows.length) {
       throw new NotFoundError('Gagal memperbarui catatan. Id tidak ditemukan');
     }
+
+    const { owner } = result.rows[0];
+    await this._cacheService.delete(`notes:${owner}`);
   }
 
   async deleteNoteById(id) {
     const query = {
-      text: 'DELETE FROM notes WHERE id = $1 RETURNING id',
+      text: 'DELETE FROM notes WHERE id = $1 RETURNING id, owner',
       values: [id],
     };
 
@@ -110,6 +128,9 @@ class NotesService {
     if (!result.rows.length) {
       throw new NotFoundError('Catatan gagal dihapus. Id tidak ditemukan');
     }
+
+    const { owner } = result.rows[0];
+    await this._cacheService.delete(`notes:${owner}`);
   }
 
   async verifyNoteOwner(id, owner) {

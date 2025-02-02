@@ -98,7 +98,7 @@ class UsersService {
     */
     const query = {
       text: 'SELECT id, username, fullname FROM users WHERE username LIKE $1',
-      values: [`%${username}%`], // Makan akan jadi sepeti ini contoh: %bebek%
+      values: [`%${username}%`], // Maka akan jadi sepeti ini contoh: %bebek%
     };
     const result = await this._pool.query(query);
     return result.rows;
